@@ -1,0 +1,125 @@
+name: Update MongoDB Network Access
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'  # Runs every 30 minutes
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  update-ip:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          
+      - name: Create IP Monitor Script
+        run: |
+          cat > monitor-ip.js << 'EOF'
+          const https = require('https');
+          const crypto = require('crypto');
+          
+          const PROJECT_ID = '${{ secrets.MONGODB_PROJECT_ID }}';
+          const PUBLIC_KEY = '${{ secrets.MONGODB_PUBLIC_KEY }}';
+          const PRIVATE_KEY = '${{ secrets.MONGODB_PRIVATE_KEY }}';
+          const IP_FILE = 'last-ip.txt';
+          const fs = require('fs');
+          
+          async function getCurrentIP() {
+            return new Promise((resolve, reject) => {
+              https.get('https://api.ipify.org', (resp) => {
+                let data = '';
+                resp.on('data', (chunk) => data += chunk);
+                resp.on('end', () => resolve(data.trim()));
+              }).on('error', reject);
+            });
+          }
+          
+          async function updateMongoDBAccess(ip) {
+            const timestamp = new Date().toISOString();
+            const digestHeader = crypto
+              .createHash('md5')
+              .update(timestamp + PUBLIC_KEY + PRIVATE_KEY)
+              .digest('hex');
+            
+            const data = JSON.stringify([{
+              ipAddress: ip,
+              comment: `Auto-updated IP - ${timestamp}`
+            }]);
+            
+            const options = {
+              hostname: 'cloud.mongodb.com',
+              path: `/api/atlas/v1.0/groups/${PROJECT_ID}/accessList`,
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Digest': digestHeader,
+                'Authorization': `Basic ${Buffer.from(`${PUBLIC_KEY}:${PRIVATE_KEY}`).toString('base64')}`
+              }
+            };
+            
+            return new Promise((resolve, reject) => {
+              const req = https.request(options, (res) => {
+                let data = '';
+                res.on('data', (chunk) => data += chunk);
+                res.on('end', () => {
+                  if (res.statusCode === 200 || res.statusCode === 201) {
+                    resolve(data);
+                  } else {
+                    reject(`Failed to update IP: ${res.statusCode} ${data}`);
+                  }
+                });
+              });
+              
+              req.on('error', reject);
+              req.write(data);
+              req.end();
+            });
+          }
+          
+          async function main() {
+            try {
+              const currentIP = await getCurrentIP();
+              console.log(`Current IP: ${currentIP}`);
+              
+              let lastIP = '';
+              try {
+                lastIP = fs.readFileSync(IP_FILE, 'utf8').trim();
+              } catch (err) {
+                console.log('No previous IP file found');
+              }
+              
+              if (currentIP !== lastIP) {
+                console.log('IP has changed, updating MongoDB Network Access...');
+                await updateMongoDBAccess(currentIP);
+                fs.writeFileSync(IP_FILE, currentIP);
+                console.log('MongoDB Network Access updated successfully');
+              } else {
+                console.log('IP has not changed, no update needed');
+              }
+            } catch (error) {
+              console.error('Error:', error);
+              process.exit(1);
+            }
+          }
+          
+          main();
+          EOF
+
+      - name: Run IP Monitor
+        run: node monitor-ip.js
+        
+      - name: Commit IP File
+        if: success()
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add last-ip.txt
+          git commit -m "Update IP address" || echo "No changes to commit"
+          git push
