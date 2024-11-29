@@ -61,6 +61,35 @@ powershell.exe -ExecutionPolicy Bypass -File "C:\\path\\to\\monitor-ip.ps1"
 powershell.exe -ExecutionPolicy Bypass -File "C:\\path\\to\\monitor-ip.ps1"
 
 ---
+
+setup-migration.ps1:
+1. Save the script as `setup-migration.ps1`
+2. Run it as administrator:
+powershell.exe -ExecutionPolicy Bypass -File "setup-migration.ps1"
+
+After installation, create a migrations directory and migration files:
+
+1. Create migrations folder:
+   mkdir migrations
+   
+Create a new migration:
+   migrate create -ext .sql -dir migrations -seq init_schema
+
+Edit the generated migration files in the migrations folder
+
+---
+
+mongo-ip-monitor.ps1:
+1. Save it as `mongo-ip-monitor.ps1`
+2. Replace these values at the top:
+   $PROJECT_ID = "your-project-id"
+   $PUBLIC_KEY = "your-public-key"
+   $PRIVATE_KEY = "your-private-key"
+
+3. Run as administrator:
+   powershell.exe -ExecutionPolicy Bypass -File "C:\\path\\to\\mongo-ip-monitor.ps1"
+
+---
 ---
 
 Description of the scripts:
@@ -161,3 +190,40 @@ The script will now add detailed comments to your MongoDB Network Access entries
 - Know when the IP was last updated
 - Identify who was using the computer
 - Distinguish between different locations if you use the script on multiple machines
+
+---
+
+setup-migration.ps1:
+This script will:
+
+1. Install Go if it's not already installed
+2. Install the golang-migrate tool
+3. Set up the necessary environment variables
+4. Place migrate.exe in an accessible location
+
+---
+
+mongo-ip-monitor.ps1:
+Key improvements in this version:
+
+1. Removed all migration-related code
+2. Added automatic cleanup of old IP entries
+3. Better error handling and logging
+4. Maintains a single IP entry per computer
+5. More detailed status logging
+
+The script will:
+
+1. Create a monitoring service that runs every 15 minutes
+2. Check your current IP address
+3. Update MongoDB Atlas Network Access when your IP changes
+4. Remove old IP entries for your computer
+5. Maintain detailed logs in `C:\\MongoIPMonitor\\ip-monitor.log`
+
+New features:
+
+- Automatic cleanup of old IP entries
+- Better tracking of which computer added which IP
+- More robust error handling
+- Detailed logging of all operations
+- Automatic task scheduling
