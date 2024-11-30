@@ -1,9 +1,6 @@
 name: Update MongoDB Network Access
 
-on:
-  schedule:
-    - cron: '*/60 * * * *'  # Runs every 30 minutes
-  workflow_dispatch:  # Allows manual trigger
+  # Allows manual trigger
 
 jobs:
   update-ip:
