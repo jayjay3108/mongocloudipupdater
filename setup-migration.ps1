@@ -1,3 +1,6 @@
+$Host.UI.RawUI.WindowTitle = 'Creates a migration.exe for the mongo ip
+update script!'
+
 # Migration Setup Script
 # Save as setup-migration.ps1
 
